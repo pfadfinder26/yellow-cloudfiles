@@ -1,4 +1,4 @@
-# Cloudfiles 0.2.2
+# Cloudfiles 0.3.0
 
 Zeigt die Dateien eines geteilten Cloud-Ordners. Entwickelt von Liam Perlaki.
 
@@ -41,23 +41,14 @@ angeboten. So wird die Cloud auch nicht für jeden Besuch gefragt.
 
 ## Eine einzelne Datei verlinken
 
-Eine einzelne Datei aus dem geteilten Ordner, mitten im Satz verlinkt, wird genauso zwischengelegt:
+Die Datei in Nextcloud teilen, „Link kopieren“, und einen ganz normalen Link damit schreiben:
 
-    [cloudfile Packliste_Kurzlager.pdf Packliste für Kurzlager]
+    [Packliste für Kurzlager](https://cloud.example.org/s/TOKEN)
 
-Das erste Argument ist der Link, der Rest der Text, ohne Text der Name der Datei ohne Endung. Die
-Datei in Nextcloud teilen, „Link kopieren“, und diesen Link einsetzen:
-
-    [cloudfile https://cloud.example.org/s/TOKEN Packliste]
-
-Eine Datei, die im geteilten Ordner aus `CloudfilesUrl` liegt, lässt sich auch über ihren Pfad
-nennen, und ein Ordnerlink samt Pfad sagt dasselbe in einer Zeile:
-
-    [cloudfile Formulare/Packliste.pdf Packliste]
-    [cloudfile nextcloud://cloud.example.org/TOKEN/Formulare/Packliste.pdf Packliste]
-
-Beim Link auf die Datei selbst fragt die Erweiterung die Cloud einmal nach ihrem Namen, die Antwort
-liegt wie eine Liste im Zwischenspeicher. Die Datei selbst wird geholt, wenn jemand sie anklickt.
+Ein Link auf eine Datei einer bekannten Cloud wird zu einem Link auf diesen Server, die Datei wird
+also zwischengelegt und genauso ausgeliefert wie eine aus einer Liste. `CloudfilesUrl` sagt, welche
+Cloud das ist, `CloudfilesServer` nennt weitere, mit Komma getrennt. Ein Link auf einen geteilten
+Ordner bleibt, was er ist, und jeder andere Link auch.
 
 Der geteilte Ordner muss ohne Passwort lesbar sein. Ein Link mit Passwort oder ein reiner
 Upload-Link lässt sich nicht auflisten.

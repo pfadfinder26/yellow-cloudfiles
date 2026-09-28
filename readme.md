@@ -1,4 +1,4 @@
-# Cloudfiles 0.2.2
+# Cloudfiles 0.3.0
 
 List the files of a shared cloud folder. Developed by Liam Perlaki.
 
@@ -40,23 +40,14 @@ asked again for every visitor.
 
 ## How to link one file
 
-A single file of the shared folder, linked in a sentence, is cached the same way:
+Share the file itself in Nextcloud, "Copy link", and write an ordinary link with it:
 
-    [cloudfile Packliste_Kurzlager.pdf Packing list]
+    [Packing list](https://cloud.example.org/s/TOKEN)
 
-The first argument is the link, the rest is the text, the name of the file without its extension
-when there is no text. Share the file itself in Nextcloud, "Copy link", and paste that link:
-
-    [cloudfile https://cloud.example.org/s/TOKEN Packing list]
-
-A file that lies in the shared folder of `CloudfilesUrl` can be named by its path instead, and a
-folder share plus a path says the same in one line:
-
-    [cloudfile Forms/Packliste.pdf Packing list]
-    [cloudfile nextcloud://cloud.example.org/TOKEN/Forms/Packliste.pdf Packing list]
-
-A link of the file itself asks the cloud once for its name, that answer is kept like a listing. The
-file is fetched when somebody asks for it, and a file that is shared twice is kept once per share.
+A link to a file of a shared cloud is turned into a link to this server, so the file is cached and
+sent the same way as one from a list. `CloudfilesUrl` says which cloud that is, `CloudfilesServer`
+names further ones, separated by commas. A link to a shared folder stays what it is, and so does
+every other link.
 
 The share must be readable without a password. A share with a password, or an upload-only share,
 cannot be listed.

@@ -3,7 +3,7 @@
 // Based on Datenstrom Yellow, https://datenstrom.se/yellow/
 
 class YellowCloudfiles {
-    const VERSION = "0.2.2";
+    const VERSION = "0.3.0";
     public $yellow;         // access to API
     public $requests;       // number of requests to the cloud
     
@@ -11,6 +11,7 @@ class YellowCloudfiles {
     public function onLoad($yellow) {
         $this->yellow = $yellow;
         $this->yellow->system->setDefault("cloudfilesUrl", "");
+        $this->yellow->system->setDefault("cloudfilesServer", "");
         $this->yellow->system->setDefault("cloudfilesCacheTime", "3600");
         $this->yellow->system->setDefault("cloudfilesDepth", "2");
         $this->yellow->system->setDefault("cloudfilesLocation", "/cloudfile/");
@@ -115,6 +116,47 @@ class YellowCloudfiles {
         return in_array(strtoloweru(pathinfo($name, PATHINFO_EXTENSION)), $extensions);
     }
     
+    // Handle page content in HTML format, a link to a shared file is served by this server
+    public function onParseContentHtml($page, $text) {
+        $servers = $this->getServers();
+        if (is_array_empty($servers) || strposu($text, "/s/")===false) return null;
+        return preg_replace_callback("/(<a[^>]*\shref=\")([^\"]+)(\")/i", function ($matches) use ($servers) {
+            $url = $this->getFileUrlShared(html_entity_decode($matches[2], ENT_QUOTES, "UTF-8"), $servers);
+            return is_string_empty($url) ? $matches[0] : $matches[1].htmlspecialchars($url).$matches[3];
+        }, $text);
+    }
+
+    // Return the servers whose shares are served by this server
+    public function getServers() {
+        $servers = array();
+        foreach (array($this->yellow->system->get("cloudfilesUrl"),
+            $this->yellow->system->get("cloudfilesServer")) as $setting) {
+            foreach (preg_split("/\s*,\s*/", $setting) as $url) {
+                list($server) = $this->getShare($url);
+                if (is_string_empty($server) && preg_match("#^(https?://[^/]+)#", trim($url), $matches)) {
+                    $server = $matches[1];
+                }
+                if (!is_string_empty($server)) $servers[] = $server;
+            }
+        }
+        return array_unique($servers);
+    }
+
+    // Return the link of this server for a shared file, empty for anything else
+    public function getFileUrlShared($url, $servers) {
+        list($server, $token) = $this->getShare($url);
+        if (is_string_empty($token) || !in_array($server, $servers)) return "";
+        list($dummy, $dummy, $path) = $this->getShareFile($url);
+        $fileId = "";
+        if (is_string_empty($path)) {
+            list($name, $fileId) = $this->getSharedFile($server, $token);
+        } else {
+            $name = basename($path);
+        }
+        if (is_string_empty($name)) return "";
+        return $this->getFileUrl($server, $token, $name, false, $path, 0, $fileId);
+    }
+
     // Handle page content element
     public function onParseContentElement($page, $name, $text, $attributes, $type) {
         $output = null;
@@ -132,40 +174,23 @@ class YellowCloudfiles {
             $page->setLastModified(time());
             $output = $this->getFilesHtml($files, "$server/s/$token");
         }
-        if ($name=="cloudfile" && ($type=="block" || $type=="inline")) {
-            list($url, $text) = $this->yellow->toolbox->getTextList($text, " ", 2);
-            if (is_string_empty($url)) return $this->getErrorHtml("Please add a file link!");
-            list($server, $token, $path) = $this->getShareFile($url);
-            if (is_string_empty($token)) return $this->getErrorHtml("Can't understand file link '$url'!");
-            $fileId = "";
-            if (is_string_empty($path)) {
-                list($nameFile, $fileId) = $this->getSharedFile($server, $token);
-            } else {
-                $nameFile = basename($path);
-            }
-            if (is_string_empty($nameFile)) return $this->getErrorHtml("Can't read file '$url'!");
-            if (is_string_empty($text)) $text = $this->getTitle($nameFile, false);
-            $output = "<a class=\"cloudfile\" href=\"".htmlspecialchars($this->getFileUrl($server, $token,
-                $nameFile, false, $path, 0, $fileId))."\">".htmlspecialchars(trim($text))."</a>";
-            if ($type=="block") $output = "<p>".$output."</p>\n";
-        }
         return $output;
     }
 
-    // Return name and file id of a file that is shared by itself, from the listing of the share
+    // Return name and file id of a file that is shared by itself, empty for a shared folder
     public function getSharedFile($server, $token) {
         $fileData = $this->getFolderData($server, $token, "");
         if (is_null($fileData)) return array("", "");
         $xml = @simplexml_load_string($fileData, "SimpleXMLElement", LIBXML_NOCDATA, "DAV:");
         if ($xml===false) return array("", "");
         foreach ($xml->response as $response) {
+            $href = rawurldecode(trim((string)$response->href));
+            if (!$this->isFolderItself($href, "")) continue;
             $properties = $response->propstat[0]->prop;
-            if (isset($properties->resourcetype->collection)) continue;
+            if (isset($properties->resourcetype->collection)) return array("", "");
             $name = trim((string)$properties->displayname);
-            if (is_string_empty($name)) $name = basename(rtrim(rawurldecode(trim((string)$response->href)), "/"));
-            if (!is_string_empty($name)) {
-                return array($name, trim((string)$properties->children("http://owncloud.org/ns")->fileid));
-            }
+            if (is_string_empty($name)) $name = basename(rtrim($href, "/"));
+            return array($name, trim((string)$properties->children("http://owncloud.org/ns")->fileid));
         }
         return array("", "");
     }
