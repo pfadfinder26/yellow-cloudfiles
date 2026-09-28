@@ -1,4 +1,4 @@
-# Cloudfiles 0.2.1
+# Cloudfiles 0.2.2
 
 Zeigt die Dateien eines geteilten Cloud-Ordners. Entwickelt von Liam Perlaki.
 

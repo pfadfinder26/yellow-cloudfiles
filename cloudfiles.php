@@ -3,7 +3,7 @@
 // Based on Datenstrom Yellow, https://datenstrom.se/yellow/
 
 class YellowCloudfiles {
-    const VERSION = "0.2.1";
+    const VERSION = "0.2.2";
     public $yellow;         // access to API
     public $requests;       // number of requests to the cloud
     
@@ -137,29 +137,43 @@ class YellowCloudfiles {
             if (is_string_empty($url)) return $this->getErrorHtml("Please add a file link!");
             list($server, $token, $path) = $this->getShareFile($url);
             if (is_string_empty($token)) return $this->getErrorHtml("Can't understand file link '$url'!");
-            $nameFile = is_string_empty($path) ? $this->getSharedFileName($server, $token) : basename($path);
+            $fileId = "";
+            if (is_string_empty($path)) {
+                list($nameFile, $fileId) = $this->getSharedFile($server, $token);
+            } else {
+                $nameFile = basename($path);
+            }
             if (is_string_empty($nameFile)) return $this->getErrorHtml("Can't read file '$url'!");
             if (is_string_empty($text)) $text = $this->getTitle($nameFile, false);
             $output = "<a class=\"cloudfile\" href=\"".htmlspecialchars($this->getFileUrl($server, $token,
-                $nameFile, false, $path, 0))."\">".htmlspecialchars(trim($text))."</a>";
+                $nameFile, false, $path, 0, $fileId))."\">".htmlspecialchars(trim($text))."</a>";
             if ($type=="block") $output = "<p>".$output."</p>\n";
         }
         return $output;
     }
 
-    // Return the name of a file that is shared by itself, from the listing of the share
-    public function getSharedFileName($server, $token) {
+    // Return name and file id of a file that is shared by itself, from the listing of the share
+    public function getSharedFile($server, $token) {
         $fileData = $this->getFolderData($server, $token, "");
-        if (is_null($fileData)) return "";
+        if (is_null($fileData)) return array("", "");
         $xml = @simplexml_load_string($fileData, "SimpleXMLElement", LIBXML_NOCDATA, "DAV:");
-        if ($xml===false) return "";
+        if ($xml===false) return array("", "");
         foreach ($xml->response as $response) {
-            if (isset($response->propstat[0]->prop->resourcetype->collection)) continue;
-            $name = trim((string)$response->propstat[0]->prop->displayname);
+            $properties = $response->propstat[0]->prop;
+            if (isset($properties->resourcetype->collection)) continue;
+            $name = trim((string)$properties->displayname);
             if (is_string_empty($name)) $name = basename(rtrim(rawurldecode(trim((string)$response->href)), "/"));
-            if (!is_string_empty($name)) return $name;
+            if (!is_string_empty($name)) {
+                return array($name, trim((string)$properties->children("http://owncloud.org/ns")->fileid));
+            }
         }
-        return "";
+        return array("", "");
+    }
+
+    // Return the name a file is cached under, the same for every share of that file
+    public function getFileHash($server, $token, $path, $fileId = "") {
+        if (!is_string_empty($fileId)) return substru(md5("$server#$fileId"), 0, 12);
+        return substru(md5("$server/$token$path"), 0, 12);
     }
 
     // Return server, token and path of one file, a path alone uses the folder of the website
@@ -250,6 +264,7 @@ class YellowCloudfiles {
             if (is_string_empty($name)) $name = basename(rtrim($href, "/"));
             $directory = isset($properties->resourcetype->collection);
             if (is_string_empty($name) || $this->isFolderItself($href, $path)) continue;
+            $fileId = trim((string)$properties->children("http://owncloud.org/ns")->fileid);
             $files[] = array(
                 "name" => $name,
                 "title" => $this->getTitle($name, $directory),
@@ -259,18 +274,18 @@ class YellowCloudfiles {
                 "size" => intval((string)$properties->getcontentlength),
                 "modified" => strtotime((string)$properties->getlastmodified),
                 "url" => $this->getFileUrl($server, $token, $name, $directory, "$path/$name",
-                    intval((string)$properties->getcontentlength)));
+                    intval((string)$properties->getcontentlength), $fileId));
         }
         return $files;
     }
     
     // Return the link of an entry, a file is served by this server so the browser can show it
-    public function getFileUrl($server, $token, $name, $directory, $path, $size) {
+    public function getFileUrl($server, $token, $name, $directory, $path, $size, $fileId = "") {
         if ($directory) return "$server/s/$token?path=".rawurlencode($path);
         if ($size>intval($this->yellow->system->get("cloudfilesFileSizeMax"))) {
             return "$server/s/$token/download?path=%2F&files=".rawurlencode($name);
         }
-        $hash = substru(md5("$server/$token$path"), 0, 12);
+        $hash = $this->getFileHash($server, $token, $path, $fileId);
         $this->setFileMeta($hash, $server, $token, $path, $name);
         return $this->yellow->system->get("coreServerBase").$this->yellow->system->get("cloudfilesLocation").
             "$hash/".rawurlencode($name);

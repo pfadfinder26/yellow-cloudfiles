@@ -1,4 +1,4 @@
-# Cloudfiles 0.2.1
+# Cloudfiles 0.2.2
 
 List the files of a shared cloud folder. Developed by Liam Perlaki.
 
