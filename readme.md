@@ -1,4 +1,4 @@
-# Cloudfiles 0.2.0
+# Cloudfiles 0.2.1
 
 List the files of a shared cloud folder. Developed by Liam Perlaki.
 
@@ -44,13 +44,19 @@ A single file of the shared folder, linked in a sentence, is cached the same way
 
     [cloudfile Packliste_Kurzlager.pdf Packing list]
 
-The first argument is the path inside the folder, the rest is the text of the link, the name of the
-file without its extension when there is none. `CloudfilesUrl` in the system settings says which
-folder that is, a link of its own says it per file:
+The first argument is the link, the rest is the text, the name of the file without its extension
+when there is no text. Share the file itself in Nextcloud, "Copy link", and paste that link:
 
+    [cloudfile https://cloud.example.org/s/TOKEN Packing list]
+
+A file that lies in the shared folder of `CloudfilesUrl` can be named by its path instead, and a
+folder share plus a path says the same in one line:
+
+    [cloudfile Forms/Packliste.pdf Packing list]
     [cloudfile nextcloud://cloud.example.org/TOKEN/Forms/Packliste.pdf Packing list]
 
-No request goes to the cloud while the page is built, the file is fetched when somebody asks for it.
+A link of the file itself asks the cloud once for its name, that answer is kept like a listing. The
+file is fetched when somebody asks for it, and a file that is shared twice is kept once per share.
 
 The share must be readable without a password. A share with a password, or an upload-only share,
 cannot be listed.

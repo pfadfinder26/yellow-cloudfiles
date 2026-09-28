@@ -3,7 +3,7 @@
 // Based on Datenstrom Yellow, https://datenstrom.se/yellow/
 
 class YellowCloudfiles {
-    const VERSION = "0.2.0";
+    const VERSION = "0.2.1";
     public $yellow;         // access to API
     public $requests;       // number of requests to the cloud
     
@@ -133,17 +133,33 @@ class YellowCloudfiles {
             $output = $this->getFilesHtml($files, "$server/s/$token");
         }
         if ($name=="cloudfile" && ($type=="block" || $type=="inline")) {
-            list($file, $text) = $this->yellow->toolbox->getTextList($text, " ", 2);
-            list($server, $token, $path) = $this->getShareFile($file);
-            if (is_string_empty($token)) return $this->getErrorHtml("Can't understand file link '$file'!");
-            if (is_string_empty($path)) return $this->getErrorHtml("Please add the file in the folder!");
-            $nameFile = basename($path);
+            list($url, $text) = $this->yellow->toolbox->getTextList($text, " ", 2);
+            if (is_string_empty($url)) return $this->getErrorHtml("Please add a file link!");
+            list($server, $token, $path) = $this->getShareFile($url);
+            if (is_string_empty($token)) return $this->getErrorHtml("Can't understand file link '$url'!");
+            $nameFile = is_string_empty($path) ? $this->getSharedFileName($server, $token) : basename($path);
+            if (is_string_empty($nameFile)) return $this->getErrorHtml("Can't read file '$url'!");
             if (is_string_empty($text)) $text = $this->getTitle($nameFile, false);
             $output = "<a class=\"cloudfile\" href=\"".htmlspecialchars($this->getFileUrl($server, $token,
                 $nameFile, false, $path, 0))."\">".htmlspecialchars(trim($text))."</a>";
             if ($type=="block") $output = "<p>".$output."</p>\n";
         }
         return $output;
+    }
+
+    // Return the name of a file that is shared by itself, from the listing of the share
+    public function getSharedFileName($server, $token) {
+        $fileData = $this->getFolderData($server, $token, "");
+        if (is_null($fileData)) return "";
+        $xml = @simplexml_load_string($fileData, "SimpleXMLElement", LIBXML_NOCDATA, "DAV:");
+        if ($xml===false) return "";
+        foreach ($xml->response as $response) {
+            if (isset($response->propstat[0]->prop->resourcetype->collection)) continue;
+            $name = trim((string)$response->propstat[0]->prop->displayname);
+            if (is_string_empty($name)) $name = basename(rtrim(rawurldecode(trim((string)$response->href)), "/"));
+            if (!is_string_empty($name)) return $name;
+        }
+        return "";
     }
 
     // Return server, token and path of one file, a path alone uses the folder of the website
