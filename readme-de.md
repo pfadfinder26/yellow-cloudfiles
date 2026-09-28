@@ -1,4 +1,4 @@
-# Cloudfiles 0.3.0
+# Cloudfiles 0.4.0
 
 Zeigt die Dateien eines geteilten Cloud-Ordners. Entwickelt von Liam Perlaki.
 
@@ -64,8 +64,8 @@ Upload-Link lässt sich nicht auflisten.
 `CloudfilesLocation` wo die Dateien ausgeliefert werden, `/cloudfile/`  
 `CloudfilesLabelOpen`, `CloudfilesLabelEmpty` die Wörter auf der Seite
 
-Die Listen liegen in `system/extensions/cloudfiles-*.cache`, die Notizen zu einer einzelnen Datei
-in `system/extensions/cloudfiles-file-*.meta`: beide enthalten den Token des Links und bleiben
+Die Listen liegen in `system/cache/cloudfiles-*.cache`, die Notizen zu einer einzelnen Datei
+in `system/cache/cloudfiles-file-*.meta`: beide enthalten den Token des Links und bleiben
 deshalb aus dem Medienordner heraus. Nur die Dateien selbst liegen in `media/downloads`. Ist ein
 Ordner nicht erreichbar, gilt die letzte Kopie.
 

@@ -1,4 +1,4 @@
-# Cloudfiles 0.3.0
+# Cloudfiles 0.4.0
 
 List the files of a shared cloud folder. Developed by Liam Perlaki.
 
@@ -63,8 +63,8 @@ cannot be listed.
 `CloudfilesLocation` where the files are served, `/cloudfile/`  
 `CloudfilesLabelOpen`, `CloudfilesLabelEmpty` the words on the page
 
-The listings are kept in `system/extensions/cloudfiles-*.cache`, the notes about a single file in
-`system/extensions/cloudfiles-file-*.meta`: both carry the token of the share, so they stay out of
+The listings are kept in `system/cache/cloudfiles-*.cache`, the notes about a single file in
+`system/cache/cloudfiles-file-*.meta`: both carry the token of the share, so they stay out of
 the media directory. Only the files themselves go to `media/downloads`. A folder that cannot be
 reached falls back to the last copy.
 

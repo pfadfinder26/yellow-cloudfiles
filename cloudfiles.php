@@ -3,7 +3,7 @@
 // Based on Datenstrom Yellow, https://datenstrom.se/yellow/
 
 class YellowCloudfiles {
-    const VERSION = "0.3.0";
+    const VERSION = "0.4.0";
     public $yellow;         // access to API
     public $requests;       // number of requests to the cloud
     
@@ -64,7 +64,7 @@ class YellowCloudfiles {
         if ($fileData===false || is_string_empty($fileData)) {
             return is_file($fileName) ? $this->yellow->toolbox->readFile($fileName) : null;
         }
-        $this->yellow->toolbox->writeFile($fileName, $fileData);
+        $this->yellow->toolbox->writeFile($fileName, $fileData, true);
         return $fileData;
     }
     
@@ -75,7 +75,7 @@ class YellowCloudfiles {
             "path" => $path, "name" => $name);
         $fileData = json_encode($meta);
         if (!is_file($fileName) || $this->yellow->toolbox->readFile($fileName)!=$fileData) {
-            $this->yellow->toolbox->writeFile($fileName, $fileData);
+            $this->yellow->toolbox->writeFile($fileName, $fileData, true);
         }
         return $meta;
     }
@@ -83,7 +83,7 @@ class YellowCloudfiles {
     // Return the name of a cache file, the notes about a file and the listings
     // hold the token of the share, so they stay out of the media directory
     public function getCacheFileName($name, $extension) {
-        return $this->yellow->system->get("coreExtensionDirectory")."cloudfiles-$name.$extension";
+        return $this->yellow->system->get("coreCacheDirectory")."cloudfiles-$name.$extension";
     }
 
     // Return the name of the cached file itself, in the downloads of this website
@@ -242,7 +242,7 @@ class YellowCloudfiles {
     
     // Return folder listing, from cache if it is fresh enough
     public function getFolderData($server, $token, $path = "") {
-        $fileName = $this->yellow->system->get("coreExtensionDirectory")."cloudfiles-".
+        $fileName = $this->yellow->system->get("coreCacheDirectory")."cloudfiles-".
             substru(md5("$server/$token/$path"), 0, 8).".cache";
         $cacheTime = intval($this->yellow->system->get("cloudfilesCacheTime"));
         if (is_file($fileName) && filemtime($fileName)+$cacheTime>time()) {
@@ -264,7 +264,7 @@ class YellowCloudfiles {
         if ($fileData===false || strposu($fileData, "<d:multistatus")===false) {
             return is_file($fileName) ? $this->yellow->toolbox->readFile($fileName) : null;
         }
-        $this->yellow->toolbox->writeFile($fileName, $fileData);
+        $this->yellow->toolbox->writeFile($fileName, $fileData, true);
         return $fileData;
     }
     
