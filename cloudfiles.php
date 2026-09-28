@@ -3,7 +3,7 @@
 // Based on Datenstrom Yellow, https://datenstrom.se/yellow/
 
 class YellowCloudfiles {
-    const VERSION = "0.1.1";
+    const VERSION = "0.2.0";
     public $yellow;         // access to API
     public $requests;       // number of requests to the cloud
     
@@ -14,6 +14,7 @@ class YellowCloudfiles {
         $this->yellow->system->setDefault("cloudfilesCacheTime", "3600");
         $this->yellow->system->setDefault("cloudfilesDepth", "2");
         $this->yellow->system->setDefault("cloudfilesLocation", "/cloudfile/");
+        $this->yellow->system->setDefault("cloudfilesDownloadDirectory", "downloads/");
         $this->yellow->system->setDefault("cloudfilesFileCacheTime", "86400");
         $this->yellow->system->setDefault("cloudfilesOpenExtensions", "pdf, png, jpg, jpeg, gif, webp, txt");
         $this->yellow->system->setDefault("cloudfilesFileSizeMax", "33554432");
@@ -49,7 +50,7 @@ class YellowCloudfiles {
     
     // Return a file, from the cache of this server if it is fresh enough
     public function getFileData($meta) {
-        $fileName = $this->getCacheFileName("file-".$meta["hash"], "data");
+        $fileName = $this->getDownloadFileName($meta);
         $cacheTime = intval($this->yellow->system->get("cloudfilesFileCacheTime"));
         if (is_file($fileName) && filemtime($fileName)+$cacheTime>time()) {
             return $this->yellow->toolbox->readFile($fileName);
@@ -78,9 +79,20 @@ class YellowCloudfiles {
         return $meta;
     }
     
-    // Return the name of a cache file
+    // Return the name of a cache file, the notes about a file and the listings
+    // hold the token of the share, so they stay out of the media directory
     public function getCacheFileName($name, $extension) {
         return $this->yellow->system->get("coreExtensionDirectory")."cloudfiles-$name.$extension";
+    }
+
+    // Return the name of the cached file itself, in the downloads of this website
+    public function getDownloadFileName($meta) {
+        $name = $this->getFileNameSafe($meta["name"]);
+        $extension = pathinfo($name, PATHINFO_EXTENSION);
+        $name = pathinfo($name, PATHINFO_FILENAME)."-".substru($meta["hash"], 0, 10);
+        if (!is_string_empty($extension)) $name .= ".".$extension;
+        return $this->yellow->system->get("coreMediaDirectory").
+            $this->yellow->system->get("cloudfilesDownloadDirectory").$name;
     }
     
     // Return the type of a file, from its extension, never from the cloud
@@ -120,7 +132,33 @@ class YellowCloudfiles {
             $page->setLastModified(time());
             $output = $this->getFilesHtml($files, "$server/s/$token");
         }
+        if ($name=="cloudfile" && ($type=="block" || $type=="inline")) {
+            list($file, $text) = $this->yellow->toolbox->getTextList($text, " ", 2);
+            list($server, $token, $path) = $this->getShareFile($file);
+            if (is_string_empty($token)) return $this->getErrorHtml("Can't understand file link '$file'!");
+            if (is_string_empty($path)) return $this->getErrorHtml("Please add the file in the folder!");
+            $nameFile = basename($path);
+            if (is_string_empty($text)) $text = $this->getTitle($nameFile, false);
+            $output = "<a class=\"cloudfile\" href=\"".htmlspecialchars($this->getFileUrl($server, $token,
+                $nameFile, false, $path, 0))."\">".htmlspecialchars(trim($text))."</a>";
+            if ($type=="block") $output = "<p>".$output."</p>\n";
+        }
         return $output;
+    }
+
+    // Return server, token and path of one file, a path alone uses the folder of the website
+    public function getShareFile($file) {
+        list($server, $token) = $this->getShare($file);
+        if (!is_string_empty($token)) {
+            $path = "";
+            if (preg_match("#^nextcloud://[^/]+/[^/?\#]+(/.*)$#", $file, $matches)) $path = $matches[1];
+            if (preg_match("#^https?://[^/]+/(?:index\.php/)?s/[^/?\#]+(?:\?path=([^&\#]*))?#", $file, $matches)) {
+                if (isset($matches[1])) $path = rawurldecode($matches[1]);
+            }
+            return array($server, $token, $path);
+        }
+        list($server, $token) = $this->getShare($this->yellow->system->get("cloudfilesUrl"));
+        return array($server, $token, "/".ltrim($file, "/"));
     }
     
     // Return server and token of a Nextcloud folder share, as a short link or as the link from the app

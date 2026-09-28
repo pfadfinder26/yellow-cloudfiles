@@ -1,4 +1,4 @@
-# Cloudfiles 0.1.1
+# Cloudfiles 0.2.0
 
 Zeigt die Dateien eines geteilten Cloud-Ordners. Entwickelt von Liam Perlaki.
 
@@ -33,9 +33,26 @@ Dateinamen stehen ohne Endung da, Unterstriche als Leerzeichen, erster Buchstabe
 Name bleibt im Tooltip. Typ und Größe stehen in eigenen Spalten.
 
 **Die Dateien liefert der eigene Webserver aus**, sie werden nicht in die Cloud verlinkt: die
-Erweiterung holt eine Datei einmal, legt sie in `system/extensions` ab und schickt sie mit ihrem
-Typ. Ein PDF oder ein Bild öffnet sich im Browser wie gewohnt, alles andere wird zum Download
+Erweiterung holt eine Datei einmal, legt sie unter ihrem Namen samt Anfang ihrer Prüfsumme in
+`media/downloads` ab und schickt sie mit ihrem Typ. Eine Datei liegt einmal da, egal wie viele
+Seiten auf sie verweisen, weil der Name der Kopie der Datei in der Cloud folgt und nicht der
+Seite, die nach ihr fragt. Ein PDF oder ein Bild öffnet sich im Browser wie gewohnt, alles andere wird zum Download
 angeboten. So wird die Cloud auch nicht für jeden Besuch gefragt.
+
+## Eine einzelne Datei verlinken
+
+Eine einzelne Datei aus dem geteilten Ordner, mitten im Satz verlinkt, wird genauso zwischengelegt:
+
+    [cloudfile Packliste_Kurzlager.pdf Packliste für Kurzlager]
+
+Das erste Argument ist der Pfad im Ordner, der Rest der Text des Links, ohne Text der Name der
+Datei ohne Endung. `CloudfilesUrl` in den Systemeinstellungen sagt, welcher Ordner das ist, ein
+eigener Link sagt es pro Datei:
+
+    [cloudfile nextcloud://cloud.example.org/TOKEN/Formulare/Packliste.pdf Packliste]
+
+Beim Bauen der Seite geht keine Anfrage an die Cloud, die Datei wird geholt, wenn jemand sie
+anklickt.
 
 Der geteilte Ordner muss ohne Passwort lesbar sein. Ein Link mit Passwort oder ein reiner
 Upload-Link lässt sich nicht auflisten.
@@ -51,8 +68,10 @@ Upload-Link lässt sich nicht auflisten.
 `CloudfilesLocation` wo die Dateien ausgeliefert werden, `/cloudfile/`  
 `CloudfilesLabelOpen`, `CloudfilesLabelEmpty` die Wörter auf der Seite
 
-Die Listen liegen in `system/extensions/cloudfiles-*.cache`. Ist ein Ordner nicht erreichbar, gilt
-die letzte Kopie.
+Die Listen liegen in `system/extensions/cloudfiles-*.cache`, die Notizen zu einer einzelnen Datei
+in `system/extensions/cloudfiles-file-*.meta`: beide enthalten den Token des Links und bleiben
+deshalb aus dem Medienordner heraus. Nur die Dateien selbst liegen in `media/downloads`. Ist ein
+Ordner nicht erreichbar, gilt die letzte Kopie.
 
 **Datenschutz:** den Ordner und die Dateien liest der eigene Webserver, die Besucher*innen reden
 nie mit der Cloud.

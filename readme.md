@@ -1,4 +1,4 @@
-# Cloudfiles 0.1.1
+# Cloudfiles 0.2.0
 
 List the files of a shared cloud folder. Developed by Liam Perlaki.
 
@@ -32,9 +32,25 @@ File names are shown without the extension, underscores as spaces, first letter 
 name stays in the tooltip. The type and the size are their own columns.
 
 **Files are served by your own web server**, not linked into the cloud: the extension fetches a file
-once, keeps it in `system/extensions`, and sends it with the type it has. A PDF or an image opens in
+once, keeps it in `media/downloads` under its own name and the beginning of its hash, and sends it
+with the type it has. A file is kept once, however many pages link to it, because the name of the
+copy follows the file in the cloud and not the page that asks for it. A PDF or an image opens in
 the browser as usual, everything else is offered as a download. That also means the cloud is not
 asked again for every visitor.
+
+## How to link one file
+
+A single file of the shared folder, linked in a sentence, is cached the same way:
+
+    [cloudfile Packliste_Kurzlager.pdf Packing list]
+
+The first argument is the path inside the folder, the rest is the text of the link, the name of the
+file without its extension when there is none. `CloudfilesUrl` in the system settings says which
+folder that is, a link of its own says it per file:
+
+    [cloudfile nextcloud://cloud.example.org/TOKEN/Forms/Packliste.pdf Packing list]
+
+No request goes to the cloud while the page is built, the file is fetched when somebody asks for it.
 
 The share must be readable without a password. A share with a password, or an upload-only share,
 cannot be listed.
@@ -50,8 +66,10 @@ cannot be listed.
 `CloudfilesLocation` where the files are served, `/cloudfile/`  
 `CloudfilesLabelOpen`, `CloudfilesLabelEmpty` the words on the page
 
-The listings are kept in `system/extensions/cloudfiles-*.cache`. A folder that cannot be reached
-falls back to the last copy.
+The listings are kept in `system/extensions/cloudfiles-*.cache`, the notes about a single file in
+`system/extensions/cloudfiles-file-*.meta`: both carry the token of the share, so they stay out of
+the media directory. Only the files themselves go to `media/downloads`. A folder that cannot be
+reached falls back to the last copy.
 
 **Data protection:** the folder and the files are read by your web server, your visitors never talk
 to the cloud.
