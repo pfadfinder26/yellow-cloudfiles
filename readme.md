@@ -1,4 +1,4 @@
-# Cloudfiles 0.5.0
+# Cloudfiles 0.5.1
 
 List the files of a shared cloud folder. Developed by Liam Perlaki.
 
@@ -71,9 +71,12 @@ it as usual, a gallery of `cloud/` for instance, and the thumbnails that go with
 
 If the [editrail extension](https://github.com/pfadfinder26/yellow-editrail) is there, every file
 this extension fetched says so among the files of the website: a button opens where it comes from
-in the cloud, another fetches it again, for a file that was changed there. Below them stand the
-files of `CloudfilesUrl` that are not on this website yet, each with a button that fetches it, so
-an editor can see what there is instead of waiting for the first visitor to ask for it. Fetching
+in the cloud, another fetches it again, for a file that was changed there. The files of `CloudfilesUrl` that are not on this
+website yet stand among them, in the folder they would land in, marked with a cloud and with a
+button that fetches them, so an editor sees what there is instead of waiting for the first visitor
+to ask for it. Written into a page, a file of the cloud is written as the link it came from, not as
+the copy that lies here, whether it has been fetched or not: the page says where the file belongs
+and this extension does the fetching, as it does for a link that somebody types. Fetching
 needs somebody who is logged in, whom the edit extension knows, and the token that says the
 request came from this website. Without the rail nothing of this is built, and the rail does not
 know about this extension either.

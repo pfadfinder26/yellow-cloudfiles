@@ -1,4 +1,4 @@
-# Cloudfiles 0.5.0
+# Cloudfiles 0.5.1
 
 Zeigt die Dateien eines geteilten Cloud-Ordners. Entwickelt von Liam Perlaki.
 
@@ -75,9 +75,12 @@ weitere wie gewohnt, eine Galerie über `cloud/` zum Beispiel, samt der Vorschau
 
 Gibt es die [Editrail-Erweiterung](https://github.com/pfadfinder26/yellow-editrail), sagt jede
 Datei, die diese Erweiterung geholt hat, das bei den Dateien der Website: ein Knopf öffnet, woher
-sie kommt, ein zweiter holt sie erneut, wenn sie sich in der Cloud geändert hat. Darunter stehen
-die Dateien aus `CloudfilesUrl`, die noch nicht auf dieser Website sind, jede mit einem Knopf, der
-sie holt, damit man sieht, was es gibt, statt auf den ersten Besuch zu warten. Holen darf nur, wer
+sie kommt, ein zweiter holt sie erneut, wenn sie sich in der Cloud geändert hat. Die Dateien aus `CloudfilesUrl`, die noch nicht auf
+dieser Website sind, stehen mitten darunter, in dem Ordner, in dem sie landen würden, mit einer
+Wolke gezeichnet und mit einem Knopf, der sie holt, damit man sieht, was es gibt, statt auf den
+ersten Besuch zu warten. In eine Seite geschrieben wird eine Datei der Cloud als der Link, von dem
+sie kam, nicht als die Kopie, die hier liegt, ob sie schon geholt wurde oder nicht: die Seite sagt,
+wohin die Datei gehört, und diese Erweiterung holt sie, wie bei jedem getippten Link auch. Holen darf nur, wer
 angemeldet ist, wen also die Edit-Erweiterung kennt, und die Anfrage muss den Token tragen, der
 sagt, dass sie von dieser Website kam. Ohne die Leiste entsteht nichts davon, und die Leiste weiß
 umgekehrt nichts von dieser Erweiterung.

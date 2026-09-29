@@ -3,7 +3,7 @@
 // Based on Datenstrom Yellow, https://datenstrom.se/yellow/
 
 class YellowCloudfiles {
-    const VERSION = "0.5.0";
+    const VERSION = "0.5.1";
     const PRIORITY = 17;    // before the edit extension, it answers every request under /edit/
     public $yellow;         // access to API
     public $requests;       // number of requests to the cloud
@@ -28,7 +28,7 @@ class YellowCloudfiles {
         $this->yellow->system->setDefault("cloudfilesLabelSource", "Show in the cloud");
         $this->yellow->system->setDefault("cloudfilesLabelReload", "Fetch again from the cloud");
         $this->yellow->system->setDefault("cloudfilesLabelFetch", "Fetch to this website");
-        $this->yellow->system->setDefault("cloudfilesLabelCloud", "In the cloud");
+        $this->yellow->system->setDefault("cloudfilesLabelInsert", "Insert into the page");
     }
     
     // Return where a file is asked for again. It lies below the editing location, because the
@@ -210,26 +210,29 @@ class YellowCloudfiles {
         return is_array($meta) && isset($meta["location"]) ? $meta : null;
     }
 
-    // Return the files of the cloud that are not on this website yet, so an editor can see
-    // what there is and fetch what is wanted, without waiting for the first visitor
+    // Return the files of the cloud that are not on this website yet, so an editor can see what
+    // there is and fetch what is wanted. Each one stands in the folder it would land in
     public function onEditrailMedia() {
         $url = $this->yellow->system->get("cloudfilesUrl");
-        if (is_string_empty($url)) return "";
+        if (is_string_empty($url)) return array();
         list($server, $token) = $this->getShare($url);
-        if (is_string_empty($token)) return "";
+        if (is_string_empty($token)) return array();
         $this->requests = 0;
         $files = $this->getFolder($server, $token, "", intval($this->yellow->system->get("cloudfilesDepth")), array());
-        if (is_null($files)) return "";
-        $output = "";
+        if (is_null($files)) return array();
+        $entries = array();
+        $media = ltrim($this->yellow->system->get("coreMediaLocation"), "/");
         foreach ($this->getFilesFlat($files) as $file) {
             $meta = $this->getFileMetaUrl($file["url"]);
-            if (is_null($meta) || is_file($this->getFileNameCached($meta))) continue;
-            $output .= $this->getMediaFileHtml($meta, "$server/s/$token?path=".rawurlencode(dirname($file["path"])));
+            if (is_null($meta)) continue;
+            $fileName = $this->getFileNameCached($meta);
+            if (is_file($fileName)) continue;
+            $entries[] = array(
+                "folder" => dirname(substru($fileName, strlenu($media))),
+                "name" => $meta["name"],
+                "html" => $this->getMediaFileHtml($meta));
         }
-        if (is_string_empty($output)) return "";
-        return "<span class=\"editrail-page editrail-folder\"><span class=\"editrail-title\">".
-            htmlspecialchars($this->yellow->system->get("cloudfilesLabelCloud"))."</span></span>\n".
-            "<ul>\n".$output."</ul>\n";
+        return $entries;
     }
 
     // Return the files of a listing, the ones inside a folder as well
@@ -260,15 +263,24 @@ class YellowCloudfiles {
     }
 
     // Return one file of the cloud that is not here yet, a row for the editing rail
-    public function getMediaFileHtml($meta, $url) {
+    public function getMediaFileHtml($meta) {
         $textFetch = htmlspecialchars($this->yellow->system->get("cloudfilesLabelFetch"));
         $textSource = htmlspecialchars($this->yellow->system->get("cloudfilesLabelSource"));
         $output = "<li class=\"editrail-file\">\n";
-        $output .= "<span class=\"editrail-file-icon\" aria-hidden=\"true\"></span>";
+        $output .= "<span class=\"editrail-file-icon editrail-file-icon-cloud\" aria-hidden=\"true\"></span>";
         $output .= "<span class=\"editrail-file-name\" title=\"".htmlspecialchars($meta["path"])."\">".
             htmlspecialchars($meta["name"])."</span>";
+        $textInsert = htmlspecialchars($this->yellow->system->get("cloudfilesLabelInsert"));
+        $markdown = $this->isImage($meta["name"]) ? "![](".$this->getFileUrlSource($meta).")" :
+            "[".pathinfo($meta["name"], PATHINFO_FILENAME)."](".$this->getFileUrlSource($meta).")";
         $output .= "<span class=\"editrail-tools\">";
-        $output .= "<a class=\"editrail-tool editrail-tool-open\" href=\"".htmlspecialchars($url)."\"".
+        // a file that is not here yet can be written into a page all the same, it is fetched
+        // the first time the page is shown
+        $output .= "<button type=\"button\" class=\"editrail-tool editrail-tool-insert\"".
+            " data-markdown=\"".htmlspecialchars($markdown)."\"".
+            " title=\"".$textInsert."\" aria-label=\"".$textInsert."\"></button>";
+        $output .= "<a class=\"editrail-tool editrail-tool-open\" href=\"".
+            htmlspecialchars($this->getSourceUrl($meta))."\"".
             " target=\"_blank\" rel=\"noreferrer\" title=\"".$textSource."\" aria-label=\"".$textSource."\"></a>";
         $output .= $this->getReloadFormHtml("cloudfiles-fetch", $meta["hash"], $textFetch);
         $output .= "</span>\n</li>\n";
@@ -299,6 +311,25 @@ class YellowCloudfiles {
             " target=\"_blank\" rel=\"noreferrer\" title=\"".$textSource."\" aria-label=\"".$textSource."\"></a>";
         $output .= $this->getReloadFormHtml("cloudfiles-fetch", $meta["hash"], $textReload);
         return $output;
+    }
+
+    // Return what is written into a page for a file that came from the cloud: the link it came
+    // from, so the page says where it belongs and this extension fetches it as it always does
+    public function onEditrailFileMarkdown($location) {
+        $meta = $this->getFileMetaLocation($location);
+        if (is_null($meta)) return "";
+        $url = $this->getFileUrlSource($meta);
+        return $this->isImage($meta["name"]) ? "![](".$url.")" :
+            "[".pathinfo($meta["name"], PATHINFO_FILENAME)."](".$url.")";
+    }
+
+    // Return the link of one file of the cloud, the one an editor would copy there
+    public function getFileUrlSource($meta) {
+        $url = $meta["server"]."/s/".$meta["token"];
+        if (!is_string_empty($meta["path"]) && $meta["path"]!="/") {
+            $url .= "?path=".rawurlencode($meta["path"]);
+        }
+        return $url;
     }
 
     // Return what is known about a file of this website, null for a file of this website itself.
