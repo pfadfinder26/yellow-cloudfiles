@@ -3,7 +3,8 @@
 // Based on Datenstrom Yellow, https://datenstrom.se/yellow/
 
 class YellowCloudfiles {
-    const VERSION = "0.4.0";
+    const VERSION = "0.5.0";
+    const PRIORITY = 17;    // before the edit extension, it answers every request under /edit/
     public $yellow;         // access to API
     public $requests;       // number of requests to the cloud
     
@@ -16,15 +17,34 @@ class YellowCloudfiles {
         $this->yellow->system->setDefault("cloudfilesDepth", "2");
         $this->yellow->system->setDefault("cloudfilesLocation", "/cloudfile/");
         $this->yellow->system->setDefault("cloudfilesDownloadDirectory", "downloads/");
+        $this->yellow->system->setDefault("cloudfilesImageDirectory", "cloud/");
+        $this->yellow->system->setDefault("cloudfilesImageExtensions", "png, jpg, jpeg, gif, webp, svg");
+        $this->yellow->system->setDefault("cloudfilesImageSettings", "image, banner, thumbnail");
         $this->yellow->system->setDefault("cloudfilesFileCacheTime", "86400");
         $this->yellow->system->setDefault("cloudfilesOpenExtensions", "pdf, png, jpg, jpeg, gif, webp, txt");
         $this->yellow->system->setDefault("cloudfilesFileSizeMax", "33554432");
         $this->yellow->system->setDefault("cloudfilesLabelOpen", "Open folder");
         $this->yellow->system->setDefault("cloudfilesLabelEmpty", "No files at the moment.");
+        $this->yellow->system->setDefault("cloudfilesLabelSource", "Show in the cloud");
+        $this->yellow->system->setDefault("cloudfilesLabelReload", "Fetch again from the cloud");
+        $this->yellow->system->setDefault("cloudfilesLabelFetch", "Fetch to this website");
+        $this->yellow->system->setDefault("cloudfilesLabelCloud", "In the cloud");
     }
     
-    // Handle request, serve a file of the shared folder from the cache of this server
+    // Return where a file is asked for again. It lies below the editing location, because the
+    // cookies that say who is asking are sent there and nowhere else
+    public function getReloadLocation() {
+        $editLocation = $this->yellow->system->isExisting("editLocation") ?
+            $this->yellow->system->get("editLocation") : "/edit/";
+        return $this->yellow->system->get("coreServerBase").$editLocation."cloudfiles-reload";
+    }
+
+    // Handle request, serve a file of the shared folder from the cache of this server,
+    // or fetch a picture again for somebody who may edit this website
     public function onRequest($scheme, $address, $base, $location, $fileName) {
+        if ($base.$location==$this->getReloadLocation()) {
+            return $this->processRequestReload($scheme, $address, $base, $location, $fileName);
+        }
         $prefix = $this->yellow->system->get("cloudfilesLocation");
         if (substru($location, 0, strlenu($prefix))!=$prefix) return 0;
         if (!preg_match("#^".preg_quote($prefix, "#")."([0-9a-f]{12})/#", $location, $matches)) return 0;
@@ -41,6 +61,32 @@ class YellowCloudfiles {
             "Cache-Control" => "max-age=".intval($this->yellow->system->get("cloudfilesFileCacheTime"))), $fileData);
     }
     
+    // Fetch a file, the copy on this server is thrown away and asked for anew
+    public function processRequestReload($scheme, $address, $base, $location, $fileName) {
+        if ($this->yellow->toolbox->getServer("REQUEST_METHOD")!="POST") return $this->yellow->sendStatus(405);
+        if (!$this->isEditor($scheme, $address, $base, $location, $fileName)) return $this->yellow->sendStatus(403);
+        $meta = $this->getFileMeta(trim($this->yellow->page->getRequest("cloudfiles-fetch")));
+        if (is_null($meta)) return $this->yellow->sendStatus(404);
+        $fileNameCached = $this->getFileNameCached($meta);
+        if (is_file($fileNameCached)) @unlink($fileNameCached);
+        if (is_null($this->getFileData($meta, $fileNameCached))) return $this->yellow->sendStatus(504);
+        $back = trim($this->yellow->page->getRequest("cloudfiles-back"));
+        if (substru($back, 0, strlenu($base)+1)!="$base/") $back = "$base/";
+        return $this->yellow->sendStatus(303, $this->yellow->lookup->normaliseUrl($scheme, $address, "", $back));
+    }
+
+    // Check if the one who asks may change this website, the edit extension knows
+    public function isEditor($scheme, $address, $base, $location, $fileName) {
+        if (!$this->yellow->extension->isExisting("edit")) return false;
+        $edit = $this->yellow->extension->get("edit");
+        if (!$edit->checkUserAuth($scheme, $address, $base, $location, $fileName)) return false;
+        if (!$edit->response->isUserAccess("upload", "/")) return false;
+        $tokenExpected = $this->yellow->toolbox->getCookie("yellowcsrftoken");
+        $tokenReceived = $this->yellow->page->getRequest("yellowcsrftoken");
+        return !is_string_empty($tokenExpected) &&
+            $this->yellow->toolbox->verifyToken($tokenExpected, $tokenReceived);
+    }
+
     // Return what is known about a file, null if this server never saw it
     public function getFileMeta($hash) {
         $fileName = $this->getCacheFileName("file-$hash", "meta");
@@ -50,8 +96,8 @@ class YellowCloudfiles {
     }
     
     // Return a file, from the cache of this server if it is fresh enough
-    public function getFileData($meta) {
-        $fileName = $this->getDownloadFileName($meta);
+    public function getFileData($meta, $fileName = "") {
+        if (is_string_empty($fileName)) $fileName = $this->getDownloadFileName($meta);
         $cacheTime = intval($this->yellow->system->get("cloudfilesFileCacheTime"));
         if (is_file($fileName) && filemtime($fileName)+$cacheTime>time()) {
             return $this->yellow->toolbox->readFile($fileName);
@@ -116,10 +162,194 @@ class YellowCloudfiles {
         return in_array(strtoloweru(pathinfo($name, PATHINFO_EXTENSION)), $extensions);
     }
     
-    // Handle page content in HTML format, a link to a shared file is served by this server
+    // Handle page meta data, a picture of the cloud stands where a picture of this website stands
+    public function onParseMetaData($page) {
+        foreach (preg_split("/\s*,\s*/", $this->yellow->system->get("cloudfilesImageSettings")) as $key) {
+            $value = $page->get($key);
+            if (is_string_empty($value) || strposu($value, "/s/")===false) continue;
+            $locations = array();
+            foreach (preg_split("/\s*,\s*/", $value) as $url) {
+                $location = $this->getImageLocation($url);
+                $locations[] = is_string_empty($location) ? $url : $location;
+            }
+            $page->set($key, implode(", ", $locations));
+        }
+    }
+
+    // Return the picture of a shared file, in the media directory of this website, empty for
+    // anything that is not a picture of a cloud this website knows. The file is fetched once,
+    // where it lands it is an ordinary picture of this website, for a banner or a gallery
+    public function getImageLocation($url) {
+        $url = trim($url);
+        if (strposu($url, "/s/")===false) return "";
+        $fileNameMeta = $this->getCacheFileName("image-".substru(md5($url), 0, 12), "meta");
+        $meta = $this->getImageMetaFile($fileNameMeta);
+        if (!is_null($meta) && is_file($meta["location"])) return $meta["location"];
+        list($server, $token, $path) = $this->getShareFile($url);
+        if (is_string_empty($token) || !in_array($server, $this->getServers())) return "";
+        $fileId = "";
+        if (is_string_empty($path)) {
+            list($name, $fileId) = $this->getSharedFile($server, $token);
+        } else {
+            $name = basename($path);
+        }
+        if (is_string_empty($name) || !$this->isImage($name)) return "";
+        $hash = $this->getFileHash($server, $token, $path, $fileId);
+        $meta = $this->setFileMeta($hash, $server, $token, $path, $name);
+        $location = $this->getImageFileName($meta);
+        if (!is_file($location) && is_null($this->getFileData($meta, $location))) return "";
+        $this->yellow->toolbox->writeFile($fileNameMeta,
+            json_encode(array("url" => $url, "location" => $location)), true);
+        return $location;
+    }
+
+    // Return the notes about a picture, null for a file this website read anywhere else
+    public function getImageMetaFile($fileName) {
+        if (!is_file($fileName)) return null;
+        $meta = @json_decode($this->yellow->toolbox->readFile($fileName), true);
+        return is_array($meta) && isset($meta["location"]) ? $meta : null;
+    }
+
+    // Return the files of the cloud that are not on this website yet, so an editor can see
+    // what there is and fetch what is wanted, without waiting for the first visitor
+    public function onEditrailMedia() {
+        $url = $this->yellow->system->get("cloudfilesUrl");
+        if (is_string_empty($url)) return "";
+        list($server, $token) = $this->getShare($url);
+        if (is_string_empty($token)) return "";
+        $this->requests = 0;
+        $files = $this->getFolder($server, $token, "", intval($this->yellow->system->get("cloudfilesDepth")), array());
+        if (is_null($files)) return "";
+        $output = "";
+        foreach ($this->getFilesFlat($files) as $file) {
+            $meta = $this->getFileMetaUrl($file["url"]);
+            if (is_null($meta) || is_file($this->getFileNameCached($meta))) continue;
+            $output .= $this->getMediaFileHtml($meta, "$server/s/$token?path=".rawurlencode(dirname($file["path"])));
+        }
+        if (is_string_empty($output)) return "";
+        return "<span class=\"editrail-page editrail-folder\"><span class=\"editrail-title\">".
+            htmlspecialchars($this->yellow->system->get("cloudfilesLabelCloud"))."</span></span>\n".
+            "<ul>\n".$output."</ul>\n";
+    }
+
+    // Return the files of a listing, the ones inside a folder as well
+    public function getFilesFlat($files) {
+        $flat = array();
+        foreach ($files as $file) {
+            if ($file["directory"]) {
+                $flat = array_merge($flat, $this->getFilesFlat($file["children"]));
+            } else {
+                $flat[] = $file;
+            }
+        }
+        return $flat;
+    }
+
+    // Return what is known about the file a link of this server stands for
+    public function getFileMetaUrl($url) {
+        $prefix = $this->yellow->system->get("coreServerBase").$this->yellow->system->get("cloudfilesLocation");
+        if (substru($url, 0, strlenu($prefix))!=$prefix) return null;
+        list($hash) = explode("/", substru($url, strlenu($prefix)));
+        return $this->getFileMeta($hash);
+    }
+
+    // Return where a file of the cloud lies on this website, a picture with the pictures
+    public function getFileNameCached($meta) {
+        return $this->isImage($meta["name"]) ?
+            $this->getImageFileName($meta) : $this->getDownloadFileName($meta);
+    }
+
+    // Return one file of the cloud that is not here yet, a row for the editing rail
+    public function getMediaFileHtml($meta, $url) {
+        $textFetch = htmlspecialchars($this->yellow->system->get("cloudfilesLabelFetch"));
+        $textSource = htmlspecialchars($this->yellow->system->get("cloudfilesLabelSource"));
+        $output = "<li class=\"editrail-file\">\n";
+        $output .= "<span class=\"editrail-file-icon\" aria-hidden=\"true\"></span>";
+        $output .= "<span class=\"editrail-file-name\" title=\"".htmlspecialchars($meta["path"])."\">".
+            htmlspecialchars($meta["name"])."</span>";
+        $output .= "<span class=\"editrail-tools\">";
+        $output .= "<a class=\"editrail-tool editrail-tool-open\" href=\"".htmlspecialchars($url)."\"".
+            " target=\"_blank\" rel=\"noreferrer\" title=\"".$textSource."\" aria-label=\"".$textSource."\"></a>";
+        $output .= $this->getReloadFormHtml("cloudfiles-fetch", $meta["hash"], $textFetch);
+        $output .= "</span>\n</li>\n";
+        return $output;
+    }
+
+    // Return the form that asks this server to fetch a file, it needs nothing but a click
+    public function getReloadFormHtml($key, $value, $text) {
+        $token = $this->yellow->toolbox->getCookie("yellowcsrftoken");
+        return "<form method=\"post\" action=\"".htmlspecialchars($this->getReloadLocation())."\">".
+            "<input type=\"hidden\" name=\"".$key."\" value=\"".htmlspecialchars($value)."\" />".
+            "<input type=\"hidden\" name=\"cloudfiles-back\" value=\"".
+            htmlspecialchars($this->yellow->page->getBase().$this->yellow->page->location)."\" />".
+            "<input type=\"hidden\" name=\"yellowcsrftoken\" value=\"".htmlspecialchars($token)."\" />".
+            "<button type=\"submit\" class=\"editrail-tool editrail-tool-reload\"".
+            " title=\"".$text."\" aria-label=\"".$text."\"></button></form>";
+    }
+
+    // Return what this extension has to say about a file of the editing rail: where it comes
+    // from, and a button that fetches it again. A picture and a download are the same here
+    public function onEditrailFile($location) {
+        $meta = $this->getFileMetaLocation($location);
+        if (is_null($meta)) return "";
+        $textSource = htmlspecialchars($this->yellow->system->get("cloudfilesLabelSource"));
+        $textReload = htmlspecialchars($this->yellow->system->get("cloudfilesLabelReload"));
+        $output = "<a class=\"editrail-tool editrail-tool-open\" href=\"".
+            htmlspecialchars($this->getSourceUrl($meta))."\"".
+            " target=\"_blank\" rel=\"noreferrer\" title=\"".$textSource."\" aria-label=\"".$textSource."\"></a>";
+        $output .= $this->getReloadFormHtml("cloudfiles-fetch", $meta["hash"], $textReload);
+        return $output;
+    }
+
+    // Return what is known about a file of this website, null for a file of this website itself.
+    // The name carries the beginning of the hash, which is what the notes are filed under
+    public function getFileMetaLocation($location) {
+        $base = $this->yellow->system->get("coreServerBase");
+        if (substru($location, 0, strlenu($base))==$base) $location = substru($location, strlenu($base));
+        $location = ltrim($location, "/");
+        if (!preg_match("/-([0-9a-f]{10})(\.[^.]+)?$/", $location, $matches)) return null;
+        foreach (glob($this->getCacheFileName("file-".$matches[1]."*", "meta")) as $fileName) {
+            $meta = @json_decode($this->yellow->toolbox->readFile($fileName), true);
+            if (!is_array($meta) || !isset($meta["hash"])) continue;
+            if ($this->getFileNameCached($meta)==$location) return $meta;
+        }
+        return null;
+    }
+
+    // Return the link into the cloud a file comes from, the folder it lies in for a folder share
+    public function getSourceUrl($meta) {
+        $url = $meta["server"]."/s/".$meta["token"];
+        $path = dirname($meta["path"]);
+        if (!is_string_empty($path) && $path!="/" && $path!=".") $url .= "?path=".rawurlencode($path);
+        return $url;
+    }
+
+    // Return where a picture of the cloud is kept, next to the pictures of this website
+    public function getImageFileName($meta) {
+        $name = $this->getFileNameSafe($meta["name"]);
+        $extension = pathinfo($name, PATHINFO_EXTENSION);
+        $name = pathinfo($name, PATHINFO_FILENAME)."-".substru($meta["hash"], 0, 10);
+        if (!is_string_empty($extension)) $name .= ".".$extension;
+        return ltrim($this->yellow->system->get("coreImageLocation"), "/").
+            $this->yellow->system->get("cloudfilesImageDirectory").$name;
+    }
+
+    // Check if a file is a picture, a picture is kept as a file and not served by this server
+    public function isImage($name) {
+        $extensions = preg_split("/\s*,\s*/", strtoloweru($this->yellow->system->get("cloudfilesImageExtensions")));
+        return in_array(strtoloweru(pathinfo($name, PATHINFO_EXTENSION)), $extensions);
+    }
+
+    // Handle page content in HTML format, a link to a shared file is served by this server,
+    // a picture of the cloud is fetched and stands here as a picture of this website
     public function onParseContentHtml($page, $text) {
         $servers = $this->getServers();
         if (is_array_empty($servers) || strposu($text, "/s/")===false) return null;
+        $text = preg_replace_callback("/(<img[^>]*\ssrc=\")([^\"]+)(\")/i", function ($matches) {
+            $location = $this->getImageLocation(html_entity_decode($matches[2], ENT_QUOTES, "UTF-8"));
+            return is_string_empty($location) ? $matches[0] :
+                $matches[1].htmlspecialchars($this->yellow->page->getBase()."/".$location).$matches[3];
+        }, $text);
         return preg_replace_callback("/(<a[^>]*\shref=\")([^\"]+)(\")/i", function ($matches) use ($servers) {
             $url = $this->getFileUrlShared(html_entity_decode($matches[2], ENT_QUOTES, "UTF-8"), $servers);
             return is_string_empty($url) ? $matches[0] : $matches[1].htmlspecialchars($url).$matches[3];

@@ -1,4 +1,4 @@
-# Cloudfiles 0.4.0
+# Cloudfiles 0.5.0
 
 Zeigt die Dateien eines geteilten Cloud-Ordners. Entwickelt von Liam Perlaki.
 
@@ -53,6 +53,35 @@ Ordner bleibt, was er ist, und jeder andere Link auch.
 Der geteilte Ordner muss ohne Passwort lesbar sein. Ein Link mit Passwort oder ein reiner
 Upload-Link lässt sich nicht auflisten.
 
+## Ein Bild verwenden
+
+Ein Bild liefert dieser Server nicht aus, es wird zu einem Bild dieser Website: die Erweiterung
+holt es einmal nach `media/images/cloud`, unter seinem Namen und dem Anfang seiner Prüfsumme, und
+in der Seite steht von da an diese Datei. Ein Freigabelink darf also überall stehen, wo ein Bild
+dieser Website steht:
+
+    Banner: https://cloud.example.org/s/TOKEN
+    Image: https://cloud.example.org/s/TOKEN?path=%2FLager%2Ffoto.jpg
+
+    ![Ein Bild](https://cloud.example.org/s/TOKEN)
+
+`CloudfilesImageSettings` sagt, welche Einstellungen einer Seite so gelesen werden, zunächst
+`Image`, `Banner` und `Thumbnail`, und eine Einstellung darf mehrere Links mit Komma getrennt
+halten. `CloudfilesImageExtensions` sagt, was als Bild gilt. Ein Bild im Text einer Seite wird
+gefunden, wo immer es steht. Weil die Datei bei den anderen Bildern liegt, funktioniert alles
+weitere wie gewohnt, eine Galerie über `cloud/` zum Beispiel, samt der Vorschaubilder dazu.
+
+## In der Bearbeitungsleiste
+
+Gibt es die [Editrail-Erweiterung](https://github.com/pfadfinder26/yellow-editrail), sagt jede
+Datei, die diese Erweiterung geholt hat, das bei den Dateien der Website: ein Knopf öffnet, woher
+sie kommt, ein zweiter holt sie erneut, wenn sie sich in der Cloud geändert hat. Darunter stehen
+die Dateien aus `CloudfilesUrl`, die noch nicht auf dieser Website sind, jede mit einem Knopf, der
+sie holt, damit man sieht, was es gibt, statt auf den ersten Besuch zu warten. Holen darf nur, wer
+angemeldet ist, wen also die Edit-Erweiterung kennt, und die Anfrage muss den Token tragen, der
+sagt, dass sie von dieser Website kam. Ohne die Leiste entsteht nichts davon, und die Leiste weiß
+umgekehrt nichts von dieser Erweiterung.
+
 ## Einstellungen
 
 `CloudfilesUrl` ein Link, der gilt, wenn `[files]` keinen hat  
@@ -62,6 +91,9 @@ Upload-Link lässt sich nicht auflisten.
 `CloudfilesOpenExtensions` was im Browser aufgeht, `pdf, png, jpg, jpeg, gif, webp, txt`  
 `CloudfilesFileSizeMax` größte Datei, die dieser Server selbst ausliefert, in Bytes, `33554432`  
 `CloudfilesLocation` wo die Dateien ausgeliefert werden, `/cloudfile/`  
+`CloudfilesImageDirectory` wo die Bilder liegen, unterhalb der Bilder, `cloud/`  
+`CloudfilesImageExtensions` was als Bild gilt, `png, jpg, jpeg, gif, webp, svg`  
+`CloudfilesImageSettings` welche Einstellungen einer Seite ein Bild halten, `image, banner, thumbnail`  
 `CloudfilesLabelOpen`, `CloudfilesLabelEmpty` die Wörter auf der Seite
 
 Die Listen liegen in `system/cache/cloudfiles-*.cache`, die Notizen zu einer einzelnen Datei

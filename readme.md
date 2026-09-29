@@ -1,4 +1,4 @@
-# Cloudfiles 0.4.0
+# Cloudfiles 0.5.0
 
 List the files of a shared cloud folder. Developed by Liam Perlaki.
 
@@ -49,6 +49,35 @@ sent the same way as one from a list. `CloudfilesUrl` says which cloud that is, 
 names further ones, separated by commas. A link to a shared folder stays what it is, and so does
 every other link.
 
+## How to use a picture
+
+A picture is not sent by this server, it is kept as a picture of this website: the extension
+fetches it once into `media/images/cloud`, under its own name and the beginning of its hash, and
+what stands in the page from then on is that file. So a share link can go wherever a picture of
+this website goes:
+
+    Banner: https://cloud.example.org/s/TOKEN
+    Image: https://cloud.example.org/s/TOKEN?path=%2FLager%2Ffoto.jpg
+
+    ![A picture](https://cloud.example.org/s/TOKEN)
+
+`CloudfilesImageSettings` says which settings of a page are read that way, `Image`, `Banner` and
+`Thumbnail` to begin with, and a setting may hold several links separated by commas.
+`CloudfilesImageExtensions` says what counts as a picture. A picture in the content of a page is
+found wherever it stands. Because the file lies with the other pictures, everything else works on
+it as usual, a gallery of `cloud/` for instance, and the thumbnails that go with it.
+
+## In the editing rail
+
+If the [editrail extension](https://github.com/pfadfinder26/yellow-editrail) is there, every file
+this extension fetched says so among the files of the website: a button opens where it comes from
+in the cloud, another fetches it again, for a file that was changed there. Below them stand the
+files of `CloudfilesUrl` that are not on this website yet, each with a button that fetches it, so
+an editor can see what there is instead of waiting for the first visitor to ask for it. Fetching
+needs somebody who is logged in, whom the edit extension knows, and the token that says the
+request came from this website. Without the rail nothing of this is built, and the rail does not
+know about this extension either.
+
 The share must be readable without a password. A share with a password, or an upload-only share,
 cannot be listed.
 
@@ -61,6 +90,9 @@ cannot be listed.
 `CloudfilesOpenExtensions` what opens in the browser, `pdf, png, jpg, jpeg, gif, webp, txt`  
 `CloudfilesFileSizeMax` biggest file this server sends itself, in bytes, `33554432`  
 `CloudfilesLocation` where the files are served, `/cloudfile/`  
+`CloudfilesImageDirectory` where the pictures are kept, below the pictures, `cloud/`  
+`CloudfilesImageExtensions` what counts as a picture, `png, jpg, jpeg, gif, webp, svg`  
+`CloudfilesImageSettings` which settings of a page hold a picture, `image, banner, thumbnail`  
 `CloudfilesLabelOpen`, `CloudfilesLabelEmpty` the words on the page
 
 The listings are kept in `system/cache/cloudfiles-*.cache`, the notes about a single file in
